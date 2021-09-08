@@ -14,7 +14,7 @@
 /************************************************************
  *                   Device Parameter
  ***********************************************************/
-#define DEVICE_ID               1004
+#define DEVICE_ID               1005
 #define DEVICE_TYPE             1
 #define RF_ACTIVATION_RETRY     10
 //#define RESET_MEMORY

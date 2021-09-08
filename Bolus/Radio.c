@@ -38,6 +38,7 @@ bool isMySlot();
 void printPldReadInfo();
 bool nrfSendLoop();
 
+bool isPayloadReady;
 bool ramReadFlag = true;
 bool _radioStartXfer = false;
 
@@ -79,6 +80,7 @@ void radioBegin()
     xferBegin(memRead, rfSend, rfAckWait, millis);
     xferConfig(1,true);
     pldPtr = NULL; //This has to be null for proper operation.
+    isPayloadReady = true;
 }
 
 void radioStart()
@@ -93,57 +95,57 @@ void radioStart()
 
 bool nrfSendLoop()
 {
-//    static uint8_t *_ptr = NULL;
-//    static uint32_t _startMillis;
-//    static uint8_t  _totalTime;
-//    static int _ackCode;
-//    static volatile uint8_t _tryCount;
-//
-//    uint16_t totalXfer = 0;
+    static uint8_t *_ptr = NULL;
+    static uint32_t _startMillis;
+    static uint8_t  _totalTime;
+    static int _ackCode;
+    static volatile uint8_t _tryCount;
+
+    uint16_t totalXfer = 0;
 //    if(_debug)
 //    {
 //       _startMillis = _millis();
 //    }
-//
-//    do
-//    {
-//        _ptr = _read();
-//        if (_ptr != NULL)
-//        {
-//            // if(_debug)
-//            // {
-//            //     _startMillis = _millis();
-//            // }
-//            _send(_ptr);
-//            _ackCode = _ackWait();
-//            if(_ackCode == 200)
-//            {
-//                _isReady = true;
-//                totalXfer++;
-//                // if(_debug)
-//                // {
-//                //      _totalTime = _millis() -  _startMillis;
-//                //      SerialPrintF(P("XFER->OK|Time:"));
-//                //   SerialPrintlnU32(_totalTime);
-//                // }
-//            }
-//            else
-//            {
+
+    do
+    {
+        _ptr = memRead();
+        if (_ptr != NULL)
+        {
+            // if(_debug)
+            // {
+            //     _startMillis = _millis();
+            // }
+            rfSend(_ptr);
+            _ackCode = rfAckWait();
+            if(_ackCode == 200)
+            {
+                isPayloadReady = true;
+                totalXfer++;
+                // if(_debug)
+                // {
+                //      _totalTime = _millis() -  _startMillis;
+                //      SerialPrintF(P("XFER->OK|Time:"));
+                //   SerialPrintlnU32(_totalTime);
+                // }
+            }
+            else
+            {
 //                if(_debug) {SerialPrintF(P("XFER->NOK"));}
-//                _isReady = false;
-//            }
-//        }
-//
-//    }while(_ptr != NULL && _isReady);
-//
-//    if(totalXfer>0)
-//    {
-//        _totalTime = _millis() -  _startMillis;
-//        SerialPrintF(P("XFER->TOTAL_PKT:"));
-//        SerialPrintU16(totalXfer);
-//        SerialPrintF(P("|Time:"));SerialPrintlnU32(_totalTime);
-//    }
-//    return _isReady;
+                isPayloadReady = false;
+            }
+        }
+
+    }while(_ptr != NULL && isPayloadReady);
+
+    if(totalXfer>0)
+    {
+        _totalTime = millis() -  _startMillis;
+        SerialPrintF(P("XFER->TOTAL_PKT:"));
+        SerialPrintU16(totalXfer);
+        SerialPrintF(P("|Time:"));SerialPrintlnU32(_totalTime);
+    }
+    return isPayloadReady;
 }
 
 void txIsr(void)
@@ -314,7 +316,26 @@ bool isMySlot()
         }
         else if(uTime != 1)
         {
-            setSecond(uTime);
+            int32_t delayTime = (int32_t)second();
+            delayTime = (int32_t)((uint32_t)delayTime-pong.second);
+            if(abs(delayTime)>1)
+            {
+                setSecond(uTime);
+            }
+
+            if (pong.isConfigChanged != 1)
+            {
+                if(abs(delayTime) < nrfConfig.perNodeInterval)
+                {
+                 if(delayTime > 0)
+                 {
+                   delayTime = delayTime*1000;
+                   delay((int32_t)delayTime);
+                   // return true;
+                 }
+                 return true;
+                }
+            }
             slotSec = calcNextSlotUnix(second(), &nrfConfig);
 //            slotSec = slotSec - second();
 //            rtcTimerResetAlarm();
