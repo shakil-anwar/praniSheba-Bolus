@@ -1,8 +1,8 @@
 #ifndef _MEMORY_H_
 #define _MEMORY_H_
 
-#include "mspDriver.h"
-#include "mspIoT.h"
+#include "./lib/mspDriver/mspDriver.h"
+#include "./lib/mspIoT/mspIoT.h"
 #include "Schema.h"
 
 

@@ -41,7 +41,7 @@ void memoryBegin()
 //    memq -> setPointer(memq, memPtrReader, memPtrWriter,5);
 //    memq -> attachBusSafety(memq, enableOthersOnbus,disableOthersOnbus);
 
-    memqBegin(&memq,0, sizeof(payload_t), TOTAL_FLASH_BUFFER);
+    memqBegin(&memq,0, 32, TOTAL_FLASH_BUFFER);
     memqSetMem(&memq, memReader, memWriter, memEraser, 4096);
     memqSetMemPtr(&memq, memPtrReader, memPtrWriter, 5);
 
@@ -125,12 +125,14 @@ void memEraser(uint32_t addr, uint16_t len)
 //  memset(flashPtr, 0, len);
     flashEraseSector(addr);
     uint32_t curPage = addr;
-    flashDumpPage(curPage, pageBuf);
+//    flashDumpPage(curPage, pageBuf);
 }
 
 void memPtrReader(struct memqPtr_t *ptr)
 {
-    SerialPrintln("MemQPtr Reader called");
+#if defined(SHOW_DEBUG)
+    SerialPrintln("MemQPtr>R>");
+#endif
 //    memcpy(ptr, &ring, sizeof(ptr_t));
 //  ringObj.readPacket((byte *)ptr);
     FRAMRead(FRAM_write_ptr, (uint8_t *)ptr, sizeof(struct memqPtr_t));
@@ -138,7 +140,9 @@ void memPtrReader(struct memqPtr_t *ptr)
 
 void memPtrWriter(struct memqPtr_t *ptr)
 {
-  SerialPrintln("MemQPtr Writer called");
+#if defined(SHOW_DEBUG)
+  SerialPrintln("MemQPtr>W>");
+#endif
 //   ringObj.savePacket((byte *)ptr);
 //  memcpy(&ring, ptr, sizeof(ptr_t));
   FRAMWrite(FRAM_write_ptr, (uint8_t *)ptr, sizeof(struct memqPtr_t));

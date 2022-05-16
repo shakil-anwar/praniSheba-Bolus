@@ -6,8 +6,8 @@
  */
 #ifndef ALL_H_
 #define ALL_H_
-#include "mspDriver.h"
-#include "mspIoT.h"
+#include "./lib/mspDriver/mspDriver.h"
+#include "./lib/mspIoT/mspIoT.h"
 #include "memory.h"
 #include "Sensors.h"
 #include "Radio.h"

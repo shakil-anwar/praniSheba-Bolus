@@ -7,8 +7,8 @@
 
 #ifndef SCHEMA_H_
 #define SCHEMA_H_
-#include "mspDriver.h"
-#include "mspIoT.h"
+#include "./lib/mspDriver/mspDriver.h"
+#include "./lib/mspIoT/mspIoT.h"
 #include "Param.h"
 
 
@@ -31,6 +31,21 @@ typedef struct bolus_t
     uint8_t y[BOLUS_SAMPLE_IN_PACKET];
     uint8_t z[BOLUS_SAMPLE_IN_PACKET];
 }bolus_t;
+
+typedef struct bolusTempdata_t
+{
+    uint32_t unixTime;
+    int temp;
+}bolusTempdata_t;
+
+typedef struct bolusTemp_t
+{
+    struct header_t header;
+    struct bolusTempdata_t tempData[4];
+    uint16_t batVolt;           //2 byte
+    uint16_t errorCode;         //2 byte
+}bolusTemp_t;
+
 
 
 typedef union payload_t

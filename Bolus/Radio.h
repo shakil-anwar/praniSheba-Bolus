@@ -7,13 +7,13 @@
 
 #ifndef RADIO_H_
 #define RADIO_H_
-#include "mspDriver.h"
-#include "mspIoT.h"
+#include "./lib/mspDriver/mspDriver.h"
+#include "./lib/mspIoT/mspIoT.h"
 
 
 void radioBegin();
 void radioStart();
-bool radioSendSM();
+uint8_t radioSendSM();
 
 //void saveAddr(addr_t *addrPtr);
 //void readAddr(addr_t *addrPtr);

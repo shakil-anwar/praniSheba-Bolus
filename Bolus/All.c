@@ -37,7 +37,7 @@ bool isHardwareOk()
 
 void alarmTask()
 {
-    SerialPrintln("--------------------------->Task Called");
+    SerialPrintln("->Task Called");
     _radioStartXfer = true;
 }
 
@@ -98,9 +98,7 @@ void setupBasic()
     mspClockSet();
     PM5CTL0 &= ~LOCKLPM5;     // Disable the GPIO power-on default high-impedance mode
     _disable_interrupt();
-
-
-
+    ds18b20_init_port();
 }
 
 
@@ -108,18 +106,23 @@ bool syncDevice()
 {
 
     lastUnixTimeConnected = readUnixTime();
+#if defined(SHOW_DEBUG)
     SerialPrint("last Saved Unix Time: ");SerialPrintlnU32(lastUnixTimeConnected);
-
-    int8_t trycount = 3;
+#endif
+    int8_t trycount = 2;
     uint32_t uTime;
     do
     {
         uTime = nrfPing();
+#if defined(SHOW_DEBUG)
         SerialPrint("NTP Time : ");SerialPrintlnU32(uTime);
+#endif
         if(uTime)
         {
             setSecond(uTime);
+#if defined(SHOW_DEBUG)
             SerialPrintln("RTC Time Set done");
+#endif
             break;
         }
         else
@@ -166,7 +169,9 @@ void useBackupTime()
 {
     if(lastUnixTimeConnected > second())
     {
-        SerialPrint("last Saved Unix Time: ");SerialPrintlnU32(lastUnixTimeConnected);
+#if defined(SHOW_DEBUG)
+        SerialPrint("last Unix Time: ");SerialPrintlnU32(lastUnixTimeConnected);
+#endif
         setSecond(lastUnixTimeConnected);
         uint32_t backUpTime = calcNextSlotUnix(second(), &nrfConfig);
         rtcSetAlarm(backUpTime,nrfConfig.momentDuration,alarmTask);

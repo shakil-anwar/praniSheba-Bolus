@@ -1,0 +1,31 @@
+# Ignore all
+*
+# Unignore Makefiles recursively
+# !*/Makefile
+
+# #Build Directories
+# [Dd]ebug/
+# [Rr]elease/
+
+# Unignore c files
+!*.c
+
+#Unignore  h files
+!*.h
+
+#Unignore  h files
+!*.cpp
+
+#Unignore  h files
+!*.ino
+
+#Unignore md file
+!*.md
+#Unignore md file
+!*.DSN
+#Unignore gitignorefile
+!.gitignore
+
+#Unignore all directory
+!*/
+/.metadata/

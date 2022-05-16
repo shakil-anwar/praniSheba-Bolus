@@ -34,8 +34,10 @@ uint32_t calcNextSlotUnix(uint32_t uSec, nrfNodeConfig_t *conf)
   {
     nexSlotSec = uSec + (conf->momentDuration - curMoment) + slotSec;
   }
+#if defined(SHOW_DEBUG)
   SerialPrint("curMoment :"); SerialPrintlnU16(curMoment);
   SerialPrint("======>>>>>next slot unix :"); SerialPrintlnU32(nexSlotSec);
+#endif
   return nexSlotSec;
 }
 
@@ -69,7 +71,9 @@ void FRAMWrite (uint8_t *framWritePtr, uint8_t *buf, uint16_t len)
 {
     unsigned int i=0;
     uint8_t  *writePtr = framWritePtr;
+#if defined(SHOW_DEBUG)
    SerialPrint("fr>w>");
+#endif
 
     SYSCFG0 = FRWPPW | PFWP;
     for (i = 0; i < len; i++)
@@ -85,7 +89,9 @@ void FRAMRead (uint8_t *framReadPtr, uint8_t *buf, uint16_t len)
 {
     unsigned int i=0;
     uint8_t  *writePtr = framReadPtr;
+#if defined(SHOW_DEBUG)
    SerialPrint("fr>r>");
+#endif
 
 //    SYSCFG0 = FRWPPW | PFWP;
     for (i = 0; i < len; i++)

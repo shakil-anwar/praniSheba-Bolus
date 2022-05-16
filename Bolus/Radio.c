@@ -48,7 +48,12 @@ nrfNodeConfig_t nrfConfig;
 payload_t pldBuf;
 uint8_t *pldPtr;
 
-uint8_t pipe0Addr[5] = { 120,124,124,124,125 };
+//uint8_t pipe0Addr[5] = {120, 124, 124, 124, 125};
+//uint8_t pipe0Addr[5] = {101, 101, 102, 103, 104};
+//uint8_t pipe0Addr[5] = {135,145,145,145,150};
+
+//uint8_t pipe0Addr[5] = { 130,140,130,140,150};
+uint8_t pipe0Addr[5] = { 201,202,203,204,205};
 
 bool radioSetLowPower()
 {
@@ -109,6 +114,13 @@ bool nrfSendLoop()
 
     do
     {
+        if(accDataReady == true)
+        {
+            sensorStatus = IDLE;
+            readOutAccFifo();
+            accDataReady = false;
+            sensorStatus = SENDING_DATA;
+        }
         _ptr = memRead();
         if (_ptr != NULL)
         {
@@ -179,10 +191,14 @@ void printPldReadInfo()
     SerialPrint("|isOld:");SerialPrintlnU8(pldObj.isOldPkt);
 }
 
-bool radioSendSM()
+uint8_t radioSendSM()
 {
-    bool isOk = isMySlot();
+    uint8_t isOk = (uint8_t)isMySlot();
     saveUnixTime();
+
+    uint32_t slotSec = calcNextSlotUnix(second(), &nrfConfig);
+    rtcSetAlarm(slotSec,nrfConfig.momentDuration,alarmTask);
+
     if (isOk)
     {
         nrfTxSetModeClient(BS_DATA,&nrfConfig);
@@ -212,7 +228,14 @@ bool radioSendSM()
 //            ramReadFlag = true;  //read from ram
         }
 
-        isOk = xferSendLoopV3();
+        if(xferSendLoopV3())
+        {
+            isOk = 1;
+        }
+        else
+        {
+            isOk = 2;
+        }
 
 //        flashPowerDown();
     }
@@ -228,18 +251,20 @@ uint8_t* memRead()
         if (pldObj.isRamActive)
         {
 //            SerialPrintln("Reading From Ram");
-            pldPtr = ramQRead();
-            ramQUpdateTail();
+            pldPtr = ramQReadTail();
+//            ramQUpdateTail();
         }
         else
         {
 //            SerialPrintln("Reading From Flash");
             pldPtr = memqRead(&memq, (uint8_t*) &pldBuf);
+            printBuffer(pldPtr,32);
+
             if (pldPtr == NULL)
             {
 //                ramReadFlag = true;
                 pldObj.isRamActive = true;
-                pldPtr = ramqGetTail();
+                pldPtr = ramQReadTail();
 //                ramQUpdateTail();
                 flashPowerDown();
 //                SerialPrintln("-----------------Switching to Ram");
@@ -302,50 +327,57 @@ bool isBsConnected()
 
 bool isMySlot()
 {
-    int8_t tryCount = 3;
+    int8_t tryCount = 1;
     uint32_t uTime = 0, slotSec;
     _nrfDebug = true;
     struct pong_t pong;
+
     do
     {
-
         uTime = nrfPingSlot(DEVICE_ID, nrfConfig.slotId, &pong);
-        if (uTime == 0)
+        int32_t delayTime = (int32_t)second();
+        delayTime = (int32_t)((uint32_t)delayTime-pong.second);
+
+        if(uTime)
         {
-            return true;
-        }
-        else if(uTime != 1)
-        {
-            int32_t delayTime = (int32_t)second();
-            delayTime = (int32_t)((uint32_t)delayTime-pong.second);
+            SerialPrint("delay Time: ");
+            SerialPrintlnS32(delayTime);
+
             if(abs(delayTime)>1)
             {
-                setSecond(uTime);
-            }
+                SerialPrint("abs delay Time: ");
+                SerialPrintlnS32(delayTime);
 
+                setSecond(pong.second);
+            }
             if (pong.isConfigChanged != 1)
             {
                 if(abs(delayTime) < nrfConfig.perNodeInterval)
                 {
-                 if(delayTime > 0)
-                 {
-                   delayTime = delayTime*1000;
-                   delay((int32_t)delayTime);
-                   // return true;
-                 }
-                 return true;
+                    if(delayTime > 0)
+                    {
+                        if(delayTime <= 1)
+                        {
+                            delayTime = delayTime*1000;
+                            delay((uint32_t)delayTime);
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                    }
+                    return true;
                 }
             }
-            slotSec = calcNextSlotUnix(second(), &nrfConfig);
-//            slotSec = slotSec - second();
-//            rtcTimerResetAlarm();
-//            timerSetAlarm(slotSec,alarmTask);
-            rtcSetAlarm(slotSec,nrfConfig.momentDuration,alarmTask);
-            break;
+            else
+            {
+                return false;
+            }
+            return false;
         }
         else
         {
-            delay(200);
+            delay(10);
         }
     }
     while (--tryCount);

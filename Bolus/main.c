@@ -29,12 +29,12 @@ enum activationState_t
 enum deviceState_t _deviceState;
 enum activationState_t _activationState;
 
-uint8_t rfSyncFail;
+uint8_t rfSyncFail,rfBeginRetry;
 uint16_t rfActivationFailCount;
 
 int main(void)
 {
-    rfSyncFail = 0; rfActivationFailCount=0;
+    rfSyncFail = 0; rfActivationFailCount=0; rfBeginRetry = 0;
 	setupBasic();
 	_deviceState = DEVICE_SETUP;
 	while(1)
@@ -43,26 +43,26 @@ int main(void)
 		{
 			case DEVICE_SETUP:
 				deviceSetup();
-				SerialPrintln("------------------->Device Setup done");
+				SerialPrintln("---->Device Setup done");
 				_deviceState = DEVICE_ACTIVATION;
-			break;
+				break;
 			case DEVICE_PRE_REG:
 			break;
 			case DEVICE_ACTIVATION:
 				deviceActivate();
-			break;
+				break;
 			case DEVICE_NORMAL_RUN:
 				deviceRun();
 //				__bis_SR_register(LPM4+GIE);
-			break;
+				break;
 			case DEVICE_POWER_CONTROL:
 				devicePwrCtrl();
-			break;
+				break;
 			default:
-			break;
+			    break;
 		}
-		deviceStatePrint();
-		routineTask();
+//		deviceStatePrint();
+//		routineTask();
 	}
 	return 0;
 }
@@ -85,12 +85,15 @@ bool deviceSetup()
 	//flash low power
 	flashPowerDown();
 	//Sensor Low power mode
+#if defined(DEVICE_HAS_LIS3DH)
 	acc_shutDown(); //implement in sensor.c
-
+#endif
 	//print debug for devicesetup
 	nrfWhichMode();
-
+#if defined(SHOW_DEBUG)
 	SerialPrintln("<=======Setup Done==========>");
+#endif
+	SerialPrintln("pS Bolus v0.2.2");
 
 	return true;
 }
@@ -103,7 +106,12 @@ bool deviceActivate()
 			//Begin Schema and others
 			schemaBegin();
 			// 1. Activate Sensor(Accelerometer)
+#if defined(DEVICE_HAS_LIS3DH)
 			sensorsBegin();
+#endif
+#if defined(DEVICE_HAS_TMP117)
+			tmp117_init();
+#endif
 			// 2. Activate Radio
 			radioBegin();
 #if defined(FACTORY_RESET)
@@ -128,7 +136,9 @@ bool deviceActivate()
 			//radio low power mode
 			radioSetLowPower(); 
 			//start sensing data
+#if defined(DEVICE_HAS_LIS3DH)
 			sensorStart();
+#endif
 			_activationState = ACTIVATION_WAIT;
             _deviceState = DEVICE_NORMAL_RUN;
 		break;
@@ -138,7 +148,7 @@ bool deviceActivate()
 			_activationState = ACTIVATION_BEGIN;
 		break;
 	}
-	activationPrint();
+//	activationPrint();
 	return true;
 }
 
@@ -146,23 +156,55 @@ bool deviceRun()
 {
     // 1.Data loggin 
 	// 2 Data Send 
-    memqSaveMemPtr(&memq);
+//    memqSaveMemPtr(&memq);
+//    float temp = ds18b20_get_temp();
+//    SerialPrint("Device Temperature: ");
+//    SerialPrintlnFloat(temp,2);
+
+//    uint32_t *tempPtr;
+//    uint64_t tempRom= readRom();
+//    tempPtr = &tempRom;
+
+
+//    SerialPrintU32(tempPtr[0]);
+//    SerialPrint(" ");
+//    SerialPrintlnU32(tempPtr[1]);
     if(_radioStartXfer)
     {
-        nrfStandby1();
-        if(!radioSendSM())
+        readOutAccFifo();
+        if((sensorStatus != SAVING_DATA) & (sensorStatus != READING_DATA))
         {
-            rfSyncFail++;
-        }else
-        {
-            rfSyncFail = 0;
+            nrfStandby1();
+            delay(5);
+            sensorStatus = SENDING_DATA;
+            if(radioSendSM()<1)
+            {
+                rfSyncFail++;
+            }
+            else
+            {
+                rfSyncFail = 0;
+            }
+    //        radioSendSM();
+#if defined(SHOW_DEBUG)
+            SerialPrintln("<=====deviceRun End=====>");
+#endif
+            nrfPowerDown();
         }
-//        radioSendSM();
-        nrfPowerDown();
         _radioStartXfer = false;
     }
+    if(abs(second() - lastAccReadTime)>60)
+    {
+        sensorsBegin();
+        sensorStart();
+    }
+    sensorStatus = IDLE;
 
-    printRunLog();
+#if defined(DEVICE_HAS_TEMP_SENSOR)
+    readTemp();
+#endif
+
+//    printRunLog();
     if(_radioStartXfer){
         return true;
     }else{
@@ -178,26 +220,45 @@ bool devicePwrCtrl()
 	// 2. Sleep Control
     if(_radioStartXfer)
     {
-        SerialPrintln("<=======Going to RUN mode==========>");
+        SerialPrintln("<RUN>");
         _deviceState = DEVICE_NORMAL_RUN;
         prevState = _deviceState;
     }else
     {
         if(prevState != _deviceState)
         {
-            SerialPrintln("<=======Going to Sleep==========>");
-//            __bis_SR_register(LPM4+GIE);
+            readOutAccFifo();
+            flashPowerDown();
+            SerialPrintln("<Sleep>");
             __low_power_mode_4();
+//            delay(200);
             if(rfSyncFail > RF_ACTIVATION_RETRY)
             {
-                _activationState = ACTIVATION_SYNC;
-                _deviceState = DEVICE_ACTIVATION;
-                nrfTxSetModeClient(COMMON_PING,&nrfConfig);
+//                _activationState = ACTIVATION_SYNC;
+//                _deviceState = DEVICE_ACTIVATION;
+//                nrfTxSetModeClient(COMMON_PING,&nrfConfig);
+#if defined(SHOW_DEBUG)
+                SerialPrintln("Fetching new NRF Config");
+#endif
+                _radioStartXfer = false;
+                nrfTxConfigHandler(DEVICE_ID, &nrfConfig, FRAM_NRF_DATA_SEND_ADDRESS, framRead, framUpdate);
+                nrfPowerDown();
+                rfBeginRetry++;
                 rfSyncFail = 0;
                 rfActivationFailCount++;
-            }else
+            }
+            else
             {
                 _deviceState = DEVICE_NORMAL_RUN;
+            }
+
+            if(rfBeginRetry > RF_BEGIN_RETRY)
+            {
+                nrfReset();
+                radioBegin();
+                radioStart();
+                nrfTxSetModeClient(BS_PING, &nrfConfig);
+                rfBeginRetry = 0;
             }
 
             prevState = _deviceState;
