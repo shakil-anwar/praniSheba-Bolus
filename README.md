@@ -3,5 +3,5 @@ This is a IoT Device based on MSP430 ultra-power saving micro-controller. Design
 Language: C
 IDE: Code Composer Studio (Texas Instrument)
 
-##Folder guide
+## Folder guide
 Main project folder: ./praniSheba-Bolus/Bolus  
